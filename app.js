@@ -52,10 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (configStr) {
             setupView.style.display = 'none';
             mainView.style.display = 'block';
+            const stats = document.getElementById('stats-container');
+            if (stats) stats.style.display = 'flex';
             generateGrid();
         } else {
             mainView.style.display = 'none';
             setupView.style.display = 'block';
+            const stats = document.getElementById('stats-container');
+            if (stats) stats.style.display = 'none';
             renderSetup();
         }
     }
@@ -133,6 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Hide setup, show main view
         setupView.style.display = 'none';
         mainView.style.display = 'block';
+        const stats = document.getElementById('stats-container');
+        if (stats) stats.style.display = 'flex';
         generateGrid();
     });
 
@@ -173,6 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Normalize to local midnight
 
+        let totalPoints = 0;
+
         for (let i = 1; i <= TOTAL_DAYS; i++) {
             const tasks = getTasksForDay(i);
             const dayState = getDayState(i);
@@ -185,18 +193,32 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const currentDayDate = new Date(start.getTime() + (i - 1) * 24 * 60 * 60 * 1000);
             const isFutureLocked = currentDayDate.getTime() > today.getTime();
+            const isPastLocked = currentDayDate.getTime() < today.getTime();
 
             // Pending / Completed / Locked logic
             let statusText = "Pending";
+            let isCompleted = false;
+            let isMissed = false;
+
+            if (totalHabits === 0) {
+                isCompleted = true;
+            } else if (totalHabits > 0 && completedHabits === totalHabits) {
+                isCompleted = true;
+            }
+
+            if (isCompleted) {
+                totalPoints++;
+            }
             
             if (isFutureLocked) {
                 card.classList.add('locked');
                 statusText = "🔒 Locked";
-            } else if (totalHabits === 0) {
-                // If no tasks assigned for this day of week, treat as completed
-                card.classList.add('completed');
-                statusText = "Completed";
-            } else if (completedHabits === totalHabits) {
+            } else if (isPastLocked && !isCompleted) {
+                card.classList.add('missed');
+                statusText = "Missed";
+                card.classList.add('locked'); // Disallow hover interactions visually
+                isMissed = true;
+            } else if (isCompleted) {
                 card.classList.add('completed');
                 statusText = "Completed";
             } else if (completedHabits > 0) {
@@ -215,9 +237,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert(`Day ${i} unlocks on ${currentDayDate.toLocaleDateString()}`);
                     return;
                 }
+                if (isPastLocked) {
+                    if (isMissed) {
+                        alert(`You missed Day ${i}! It can no longer be edited in following days.`);
+                        return;
+                    } else {
+                        alert(`Day ${i} was completed and can no longer be edited.`);
+                        return;
+                    }
+                }
                 openModal(i, tasks, dayState);
             });
             daysGrid.appendChild(card);
+        }
+
+        const pointsDisplay = document.getElementById('points-display');
+        const badgeDisplay = document.getElementById('completion-badge');
+        
+        if (pointsDisplay) {
+            pointsDisplay.textContent = totalPoints;
+        }
+        
+        if (badgeDisplay) {
+            if (totalPoints === TOTAL_DAYS) {
+                badgeDisplay.style.display = 'flex';
+            } else {
+                badgeDisplay.style.display = 'none';
+            }
         }
     }
 
@@ -331,6 +377,8 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 1; i <= TOTAL_DAYS; i++) {
                 localStorage.removeItem(`${STATE_KEY_PREFIX}${i}`);
             }
+            const stats = document.getElementById('stats-container');
+            if (stats) stats.style.display = 'none';
             initApp();
         }
     });
